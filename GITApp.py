@@ -133,6 +133,17 @@ class GitHubRepoManager:
         
          # Botón para copiar la URL
         ttk.Button(top_frame, text="Copiar", command=lambda: self.copy_to_clipboard(url_var.get())).pack(side=tk.RIGHT)
+        
+        # Etiqueta para la rama predeterminada
+        #default_branch_label = ttk.Label(default_branch_frame, text="Rama predeterminada: Cargando...").pack(side=tk.LEFT, padx=(0, 5))
+
+        # Función para actualizar la etiqueta de la rama predeterminada
+        #def update_default_branch_label():
+        #    default_branch = self.get_default_branch(repo)
+        #    default_branch_label.config(text=f"Rama predeterminada: {default_branch}")
+
+        # Llamar a la función para actualizar la etiqueta inicialmente
+        #update_default_branch_label()
 
         # Frame izquierdo 
         left_frame = ttk.Frame(repo_window, padding="10")
@@ -205,6 +216,9 @@ class GitHubRepoManager:
     def create_repo_window(self):
         create_window = tk.Toplevel(self.master)
         create_window.title("Crear Nuevo Repositorio")
+        
+        # Mantener la ventana en primer plano
+        create_window.transient(self.master)
 
         ttk.Label(create_window, text="Nombre del Repositorio:").grid(column=0, row=0, padx=5, pady=5)
         repo_name = ttk.Entry(create_window, width=30)
@@ -239,6 +253,9 @@ class GitHubRepoManager:
     def clone_repo_window(self):
         clone_window = tk.Toplevel(self.master)
         clone_window.title("Clonar Repositorio")
+        
+        # Mantener la ventana en primer plano
+        clone_window.transient(self.master)
 
         ttk.Label(clone_window, text="URL del Repositorio:").grid(column=0, row=0, padx=5, pady=5)
         repo_url = ttk.Entry(clone_window, width=50)
@@ -563,10 +580,19 @@ class GitHubRepoManager:
         except Exception as e:
             messagebox.showerror("Error", f"Ocurrió un error: {str(e)}")
 
-    def manage_branches(self, repo):
+    def manage_branches(self, repo, existing_window=None, update_default_branch_label=None):
         self.selected_repo = repo  # Guardar el repositorio seleccionado
-        branches_window = tk.Toplevel(self.master)
-        branches_window.title(f"Gestionar Ramas - {repo['name']}")
+        
+        if existing_window:
+            branches_window = existing_window
+            # Clear existing content
+            for widget in branches_window.winfo_children():
+                widget.destroy()
+        else:
+            branches_window = tk.Toplevel(self.master)
+            branches_window.title(f"Gestionar Ramas - {repo['name']}")
+            # Mantener la ventana en primer plano
+            branches_window.transient(self.master)
 
         headers = {
             'Authorization': f'token {self.token}',
@@ -575,20 +601,24 @@ class GitHubRepoManager:
         response = requests.get(f"{repo['url']}/branches", headers=headers)
         if response.status_code == 200:
             branches = response.json()
-            
+
             for branch in branches:
                 branch_frame = ttk.Frame(branches_window)
                 branch_frame.pack(fill='x', padx=5, pady=2)
                     
                 ttk.Label(branch_frame, text=branch['name']).pack(side='left')
-                ttk.Button(branch_frame, text="Eliminar", command=lambda b=branch: self.delete_branch(b)).pack(side='right')
-                ttk.Button(branch_frame, text="Establecer como predeterminada", command=lambda b=branch: self.set_default_branch(b)).pack(side='right')
-
-            ttk.Button(branches_window, text="Crear Nueva Rama", command=self.create_branch).pack(pady=10)
+                ttk.Button(branch_frame, text="Eliminar", command=lambda b=branch: self.delete_branch(b, branches_window)).pack(side='right')
+                ttk.Button(branch_frame, text="Establecer como predeterminada", command=lambda b=branch: self.set_default_branch(b, branches_window)).pack(side='right')
+                
+            ttk.Button(branches_window, text="Crear Nueva Rama", command=lambda: self.create_branch(branches_window)).pack(pady=10)
+            
+            if update_default_branch_label:
+                branches_window.after(100, update_default_branch_label)
+                
         else:
             messagebox.showerror("Error", "No se pudieron obtener las ramas del repositorio")
 
-    def delete_branch(self, branch):
+    def delete_branch(self, branch, branches_window):
         confirm = messagebox.askyesno("Confirmar", f"¿Está seguro de que desea eliminar la rama '{branch['name']}'?")
         if confirm:
             headers = {
@@ -598,11 +628,11 @@ class GitHubRepoManager:
             response = requests.delete(f"{self.selected_repo['url']}/git/refs/heads/{branch['name']}", headers=headers)
             if response.status_code == 204:
                 messagebox.showinfo("Éxito", f"Rama '{branch['name']}' eliminada con éxito")
-                self.manage_branches()  # Refresh the branches window
+                self.manage_branches(self.selected_repo, branches_window)  # Refresh the branches window
             else:
                 messagebox.showerror("Error", "No se pudo eliminar la rama")
 
-    def set_default_branch(self, branch):
+    def set_default_branch(self, branch, branches_window):
         headers = {
             'Authorization': f'token {self.token}',
             'Accept': 'application/vnd.github.v3+json'
@@ -613,10 +643,11 @@ class GitHubRepoManager:
         response = requests.patch(self.selected_repo['url'], headers=headers, json=data)
         if response.status_code == 200:
             messagebox.showinfo("Éxito", f"Rama '{branch['name']}' establecida como predeterminada")
+            self.manage_branches(self.selected_repo, branches_window)  # Actualizar la ventana existente
         else:
             messagebox.showerror("Error", "No se pudo establecer la rama como predeterminada")
 
-    def create_branch(self):
+    def create_branch(self, branches_window):
         new_branch_name = simpledialog.askstring("Nueva Rama", "Nombre de la nueva rama:")
         if new_branch_name:
             headers = {
@@ -639,7 +670,7 @@ class GitHubRepoManager:
                     response = requests.post(f"{self.selected_repo['url']}/git/refs", headers=headers, json=data)
                     if response.status_code == 201:
                         messagebox.showinfo("Éxito", f"Rama '{new_branch_name}' creada con éxito")
-                        self.manage_branches(self.selected_repo)  # Refrescar la ventana de ramas
+                        self.manage_branches(self.selected_repo, branches_window)  # Refrescar la ventana de ramas
                     else:
                         messagebox.showerror("Error", f"No se pudo crear la nueva rama. Código de estado: {response.status_code}")
                 else:
