@@ -123,7 +123,7 @@ class GitHubRepoManager:
         
         # Frame superior para la URL
         top_frame = ttk.Frame(repo_window, padding="10")
-        top_frame.grid(column=0, row=0, columnspan=2, sticky=(tk.W, tk.E))
+        top_frame.pack(fill=tk.X, expand=False)
         
         # Etiqueta y campo de texto para la URL
         ttk.Label(top_frame, text="URL del Repositorio:").pack(side=tk.LEFT, padx=(0, 5))
@@ -131,39 +131,49 @@ class GitHubRepoManager:
         url_entry = ttk.Entry(top_frame, textvariable=url_var, state='readonly', width=50)
         url_entry.pack(side=tk.LEFT, expand=True, fill=tk.X)
         
-         # Botón para copiar la URL
+        # Botón para copiar la URL
         ttk.Button(top_frame, text="Copiar", command=lambda: self.copy_to_clipboard(url_var.get())).pack(side=tk.RIGHT)
         
+        # Frame para la rama predeterminada
+        branch_frame = ttk.Frame(repo_window, padding="10")
+        branch_frame.pack(fill=tk.X, expand=False)
+        
         # Etiqueta para la rama predeterminada
-        #default_branch_label = ttk.Label(default_branch_frame, text="Rama predeterminada: Cargando...").pack(side=tk.LEFT, padx=(0, 5))
-
+        default_branch_label = ttk.Label(branch_frame, text="Rama predeterminada: Cargando...")
+        default_branch_label.pack(side=tk.LEFT)
+        
         # Función para actualizar la etiqueta de la rama predeterminada
-        #def update_default_branch_label():
-        #    default_branch = self.get_default_branch(repo)
-        #    default_branch_label.config(text=f"Rama predeterminada: {default_branch}")
+        def update_default_branch_label():
+            default_branch = self.get_default_branch(repo)
+            default_branch_label.config(text=f"Rama predeterminada: {default_branch}")
 
         # Llamar a la función para actualizar la etiqueta inicialmente
-        #update_default_branch_label()
+        update_default_branch_label()
+
+        # Frame principal para los botones
+        main_frame = ttk.Frame(repo_window, padding="10")
+        main_frame.pack(fill=tk.BOTH, expand=True)
 
         # Frame izquierdo 
-        left_frame = ttk.Frame(repo_window, padding="10")
-        left_frame.grid(column=0, row=1, sticky=(tk.N, tk.S, tk.W, tk.E))
+        left_frame = ttk.Frame(main_frame)
+        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
         
         # Botones en el frame izquierdo
-        ttk.Button(left_frame, text="Commit", command=lambda: self.git_commit(repo)).pack(fill='x', padx=5, pady=2)
-        ttk.Button(left_frame, text="Push", command=lambda: self.git_push(repo)).pack(fill='x', padx=5, pady=2)
-        ttk.Button(left_frame, text="Pull", command=lambda: self.git_pull(repo)).pack(fill='x', padx=5, pady=2)
-        ttk.Button(left_frame, text="Gestionar Ramas", command=lambda: self.manage_branches(repo)).pack(fill='x', padx=5, pady=2)
+        ttk.Button(left_frame, text="Commit", command=lambda: self.git_commit(repo)).pack(fill='x', pady=2)
+        ttk.Button(left_frame, text="Push", command=lambda: self.git_push(repo)).pack(fill='x', pady=2)
+        ttk.Button(left_frame, text="Pull", command=lambda: self.git_pull(repo)).pack(fill='x', pady=2)
+        ttk.Button(left_frame, text="Gestionar Ramas", 
+                   command=lambda: self.manage_branches(repo, update_default_branch_label=update_default_branch_label)).pack(fill='x', pady=2)
         
         # Frame derecho
-        right_frame = ttk.Frame(repo_window, padding="10")
-        right_frame.grid(column=1, row=1, sticky=(tk.N, tk.S, tk.W, tk.E))
+        right_frame = ttk.Frame(main_frame)
+        right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(5, 0))
         
         # Botones en el frame derecho
-        ttk.Button(right_frame, text="Ver Detalles", command=lambda: self.view_repo_details(repo)).pack(fill='x', padx=5, pady=2)
-        ttk.Button(right_frame, text="Abrir en Navegador", command=lambda: self.open_in_browser(repo)).pack(fill='x', padx=5, pady=2)
-        ttk.Button(right_frame, text="Eliminar Repositorio", command=lambda: self.delete_repo(repo)).pack(fill='x', padx=5, pady=2)
-        ttk.Button(right_frame, text="Cambiar Visibilidad", command=lambda: self.change_visibility(repo)).pack(fill='x', padx=5, pady=2)    
+        ttk.Button(right_frame, text="Ver Detalles", command=lambda: self.view_repo_details(repo)).pack(fill='x', pady=2)
+        ttk.Button(right_frame, text="Abrir en Navegador", command=lambda: self.open_in_browser(repo)).pack(fill='x', pady=2)
+        ttk.Button(right_frame, text="Eliminar Repositorio", command=lambda: self.delete_repo(repo)).pack(fill='x', pady=2)
+        ttk.Button(right_frame, text="Cambiar Visibilidad", command=lambda: self.change_visibility(repo)).pack(fill='x', pady=2)    
         
     def copy_to_clipboard(self, text):
         self.master.clipboard_clear()
@@ -677,6 +687,18 @@ class GitHubRepoManager:
                     messagebox.showerror("Error", f"No se pudo obtener la referencia de la rama predeterminada. Código de estado: {response.status_code}")
             else:
                 messagebox.showerror("Error", f"No se pudo obtener la información del repositorio. Código de estado: {response.status_code}")
+    
+    def get_default_branch(self, repo):
+        headers = {
+            'Authorization': f'token {self.token}',
+            'Accept': 'application/vnd.github.v3+json'
+        }
+        response = requests.get(repo['url'], headers=headers)
+        if response.status_code == 200:
+            repo_data = response.json()
+            return repo_data.get('default_branch', 'N/A')
+        else:
+            return 'Error al obtener la rama'
 
 if __name__ == "__main__":
     root = tk.Tk()
