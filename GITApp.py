@@ -432,16 +432,24 @@ class GitHubRepoManager:
             remote_branches = [ref.remote_head for ref in git_repo.remote().refs]
 
             # Si solo hay una rama, usarla directamente
-            if len(remote_branches) == 1:
-                branch_to_pull = remote_branches[0]
-            else:
+            #if len(remote_branches) == 1:
+            #    branch_to_pull = remote_branches[0]
+            #else:
                 # Si hay múltiples ramas, permitir al usuario seleccionar una
-                branch_to_pull = simpledialog.askstring("Seleccionar Rama", 
-                                                        "Seleccione la rama de la cual desea hacer pull:",
-                                                        initialvalue=git_repo.active_branch.name)
-                if not branch_to_pull or branch_to_pull not in remote_branches:
-                    messagebox.showerror("Error", "Rama no válida seleccionada.")
-                    return
+            #    branch_to_pull = simpledialog.askstring("Seleccionar Rama", 
+            #                                            "Seleccione la rama de la cual desea hacer pull:",
+            #                                            initialvalue=git_repo.active_branch.name)
+            #    if not branch_to_pull or branch_to_pull not in remote_branches:
+            #        messagebox.showerror("Error", "Rama no válida seleccionada.")
+            #        return
+            
+            # Siempre mostrar el diálogo de selección de rama
+            branch_to_pull = simpledialog.askstring("Seleccionar Rama", 
+                                                    "Seleccione la rama de la cual desea hacer pull:",
+                                                    initialvalue=git_repo.active_branch.name)
+            if not branch_to_pull or branch_to_pull not in remote_branches:
+                messagebox.showerror("Error", "Rama no válida seleccionada.")
+                return
 
             # Verificar si hay cambios locales no confirmados
             if git_repo.is_dirty():
