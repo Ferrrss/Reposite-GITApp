@@ -427,15 +427,21 @@ class GitHubRepoManager:
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudo cargar el repositorio: {str(e)}")
                 return
+            
+            # Obtener todas las ramas remotas
+            remote_branches = [ref.remote_head for ref in git_repo.remote().refs]
 
-            # Obtener la rama actual
-            try:
-                current_branch = git_repo.active_branch.name
-                print(f"Rama actual: {current_branch}")
-            except Exception as e:
-                print(f"Error al obtener la rama actual: {str(e)}")
-                messagebox.showerror("Error", f"No se pudo obtener la rama actual: {str(e)}")
-                return
+            # Si solo hay una rama, usarla directamente
+            if len(remote_branches) == 1:
+                branch_to_pull = remote_branches[0]
+            else:
+                # Si hay múltiples ramas, permitir al usuario seleccionar una
+                branch_to_pull = simpledialog.askstring("Seleccionar Rama", 
+                                                        "Seleccione la rama de la cual desea hacer pull:",
+                                                        initialvalue=git_repo.active_branch.name)
+                if not branch_to_pull or branch_to_pull not in remote_branches:
+                    messagebox.showerror("Error", "Rama no válida seleccionada.")
+                    return
 
             # Verificar si hay cambios locales no confirmados
             if git_repo.is_dirty():
@@ -490,7 +496,7 @@ class GitHubRepoManager:
 
             # Realizar el pull
             try:
-                pull_info = origin.pull(current_branch)
+                pull_info = origin.pull(branch_to_pull)
 
                 # Verificar si hubo cambios
                 if not pull_info[0].flags & pull_info[0].HEAD_UPTODATE:
@@ -502,9 +508,9 @@ class GitHubRepoManager:
                 push_confirmed = messagebox.askyesno("Confirmar Push", 
                                                     "¿Desea hacer push de los cambios locales a GitHub?")
                 if push_confirmed:
-                    push_info = origin.push(refspec=f'{current_branch}:{current_branch}')
+                    push_info = origin.push(refspec=f'{git_repo.active_branch.name}:{branch_to_pull}')
                     print(f"Push realizado: {push_info}")
-                    messagebox.showinfo("Éxito", f"Push realizado con éxito en la rama '{current_branch}'.")
+                    messagebox.showinfo("Éxito", f"Push realizado con éxito en la rama '{branch_to_pull}'.")
                 else:
                     print("Push cancelado por el usuario.")
 
@@ -512,7 +518,7 @@ class GitHubRepoManager:
                 if "Permission denied" in str(e):
                     messagebox.showerror("Error de Autenticación", "No se pudo autenticar con el repositorio remoto. Verifique sus credenciales.")
                 elif "Couldn't find remote ref" in str(e):
-                    messagebox.showerror("Error de Pull", "No se pudo encontrar la referencia remota. Verifique que la rama exista en el repositorio remoto.")
+                    messagebox.showerror("Error de Pull", f"No se pudo encontrar la referencia remota para la rama '{branch_to_pull}'. Verifique que la rama exista en el repositorio remoto.")
                 else:
                     messagebox.showerror("Error", f"No se pudo realizar la operación: {str(e)}")
             except Exception as e:
@@ -618,7 +624,7 @@ class GitHubRepoManager:
                     
                 ttk.Label(branch_frame, text=branch['name']).pack(side='left')
                 ttk.Button(branch_frame, text="Eliminar", command=lambda b=branch: self.delete_branch(b, branches_window)).pack(side='right')
-                ttk.Button(branch_frame, text="Establecer como predeterminada", command=lambda b=branch: self.set_default_branch(b, branches_window)).pack(side='right')
+                ttk.Button(branch_frame, text="Establecer como predeterminada", command=lambda b=branch: self.set_default_branch(b, branches_window, update_default_branch_label)).pack(side='right')
                 
             ttk.Button(branches_window, text="Crear Nueva Rama", command=lambda: self.create_branch(branches_window)).pack(pady=10)
             
@@ -642,7 +648,7 @@ class GitHubRepoManager:
             else:
                 messagebox.showerror("Error", "No se pudo eliminar la rama")
 
-    def set_default_branch(self, branch, branches_window):
+    def set_default_branch(self, branch, branches_window, update_default_branch_label=None):
         headers = {
             'Authorization': f'token {self.token}',
             'Accept': 'application/vnd.github.v3+json'
@@ -653,7 +659,9 @@ class GitHubRepoManager:
         response = requests.patch(self.selected_repo['url'], headers=headers, json=data)
         if response.status_code == 200:
             messagebox.showinfo("Éxito", f"Rama '{branch['name']}' establecida como predeterminada")
-            self.manage_branches(self.selected_repo, branches_window)  # Actualizar la ventana existente
+            if update_default_branch_label:
+                update_default_branch_label()
+            self.manage_branches(self.selected_repo, branches_window, update_default_branch_label)  # Actualizar la ventana de ramas
         else:
             messagebox.showerror("Error", "No se pudo establecer la rama como predeterminada")
 
