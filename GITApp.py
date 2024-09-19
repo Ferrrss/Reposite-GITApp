@@ -429,7 +429,17 @@ class GitHubRepoManager:
                 return
             
             # Obtener todas las ramas remotas
-            remote_branches = [ref.remote_head for ref in git_repo.remote().refs]
+            git_repo.git.fetch('--all')  # Asegurarse de tener la información más reciente del remoto
+            remote_branches = []
+            for remote in git_repo.remotes:
+                for ref in remote.refs:
+                    remote_branches.append(ref.remote_head)
+            
+            # Eliminar duplicados y ordenar
+            remote_branches = sorted(list(set(remote_branches)))
+
+            # Imprimir las ramas para depuración
+            print("Ramas remotas encontradas:", remote_branches)
 
             # Si solo hay una rama, usarla directamente
             #if len(remote_branches) == 1:
@@ -443,10 +453,35 @@ class GitHubRepoManager:
             #        messagebox.showerror("Error", "Rama no válida seleccionada.")
             #        return
             
-            # Siempre mostrar el diálogo de selección de rama
-            branch_to_pull = simpledialog.askstring("Seleccionar Rama", 
-                                                    "Seleccione la rama de la cual desea hacer pull:",
-                                                    initialvalue=git_repo.active_branch.name)
+            # Crear una ventana emergente para el combobox
+            popup = tk.Toplevel(self.master)
+            popup.title("Seleccionar Rama")
+            popup.geometry("300x100")
+
+            # Crear y configurar el combobox
+            branch_var = tk.StringVar()
+            branch_combobox = ttk.Combobox(popup, textvariable=branch_var)
+            branch_combobox['values'] = remote_branches
+            branch_combobox.set(git_repo.active_branch.name)  # Valor inicial
+            branch_combobox.pack(pady=10)
+
+            # Variable para almacenar la selección
+            selected_branch = [None]
+
+            # Función para manejar la selección
+            def on_select():
+                selected_branch[0] = branch_var.get()
+                popup.destroy()
+
+            # Botón para confirmar la selección
+            select_button = ttk.Button(popup, text="Seleccionar", command=on_select)
+            select_button.pack(pady=5)
+
+            # Esperar a que se cierre la ventana emergente
+            popup.wait_window()
+
+            branch_to_pull = selected_branch[0]
+            
             if not branch_to_pull or branch_to_pull not in remote_branches:
                 messagebox.showerror("Error", "Rama no válida seleccionada.")
                 return
