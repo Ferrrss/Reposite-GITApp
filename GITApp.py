@@ -9,11 +9,22 @@ import urllib.parse
 import webbrowser
 
 class GitHubRepoManager:
+    
     def __init__(self, master):
         self.master = master
         master.title("Gestor de Repositorios GitHub")
         self.token = ""
         self.setup_initial_ui()
+        
+    def center_window(self, window, width, height):
+        screen_width = window.winfo_screenwidth()
+        screen_height = window.winfo_screenheight()
+        x = (screen_width // 2) - (width // 2)
+        y = (screen_height // 2) - (height // 2)
+        window.geometry(f'{width}x{height}+{x}+{y}')
+
+    #def center_widget(self, widget):
+    #    widget.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
 
     def setup_initial_ui(self):
         self.frame = ttk.Frame(self.master, padding="10")
@@ -24,6 +35,8 @@ class GitHubRepoManager:
         self.token_entry.grid(column=1, row=0, sticky=(tk.W, tk.E), pady=5)
 
         ttk.Button(self.frame, text="Verificar Token", command=self.verify_token).grid(column=1, row=1, sticky=tk.E, pady=5)
+        
+        self.center_window(self.master, 420, 80)  # Centrar la ventana inicial
 
     def verify_token(self):
         self.token = self.token_entry.get()
@@ -113,6 +126,10 @@ class GitHubRepoManager:
         os.environ['GIT_COMMITTER_EMAIL'] = user_data.get('email') or f"{user_data['login']}@users.noreply.github.com"
 
         self.load_repos()
+        
+        # Centrar la ventana principal después de configurar toda la interfaz
+        #self.master.update_idletasks()
+        self.center_window(self.master, 600, 460)
     
     def open_repo_window(self, repo):
         repo_window = tk.Toplevel(self.master)
@@ -173,7 +190,9 @@ class GitHubRepoManager:
         ttk.Button(right_frame, text="Ver Detalles", command=lambda: self.view_repo_details(repo)).pack(fill='x', pady=2)
         ttk.Button(right_frame, text="Abrir en Navegador", command=lambda: self.open_in_browser(repo)).pack(fill='x', pady=2)
         ttk.Button(right_frame, text="Eliminar Repositorio", command=lambda: self.delete_repo(repo)).pack(fill='x', pady=2)
-        ttk.Button(right_frame, text="Cambiar Visibilidad", command=lambda: self.change_visibility(repo)).pack(fill='x', pady=2)    
+        ttk.Button(right_frame, text="Cambiar Visibilidad", command=lambda: self.change_visibility(repo)).pack(fill='x', pady=2)
+        
+        self.center_window(repo_window,600,230)  # Centrar la ventana de repositorio
         
     def copy_to_clipboard(self, text):
         self.master.clipboard_clear()
