@@ -192,7 +192,7 @@ class GitHubRepoManager:
         ttk.Button(right_frame, text="Eliminar Repositorio", command=lambda: self.delete_repo(repo)).pack(fill='x', pady=2)
         ttk.Button(right_frame, text="Cambiar Visibilidad", command=lambda: self.change_visibility(repo)).pack(fill='x', pady=2)
         
-        self.center_window(repo_window,600,230)  # Centrar la ventana de repositorio
+        self.center_window(repo_window, 600, 230)  # Centrar la ventana de repositorio
         
     def copy_to_clipboard(self, text):
         self.master.clipboard_clear()
@@ -660,7 +660,7 @@ class GitHubRepoManager:
 
     def manage_branches(self, repo, existing_window=None, update_default_branch_label=None):
         self.selected_repo = repo  # Guardar el repositorio seleccionado
-        
+
         if existing_window:
             branches_window = existing_window
             # Clear existing content
@@ -672,6 +672,19 @@ class GitHubRepoManager:
             # Mantener la ventana en primer plano
             branches_window.transient(self.master)
 
+        # Crear un canvas y un frame dentro de él para permitir el scrolling
+        canvas = tk.Canvas(branches_window)
+        scrollbar = ttk.Scrollbar(branches_window, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
         headers = {
             'Authorization': f'token {self.token}',
             'Accept': 'application/vnd.github.v3+json'
@@ -681,20 +694,37 @@ class GitHubRepoManager:
             branches = response.json()
 
             for branch in branches:
-                branch_frame = ttk.Frame(branches_window)
+                branch_frame = ttk.Frame(scrollable_frame)
                 branch_frame.pack(fill='x', padx=5, pady=2)
-                    
+
                 ttk.Label(branch_frame, text=branch['name']).pack(side='left')
                 ttk.Button(branch_frame, text="Eliminar", command=lambda b=branch: self.delete_branch(b, branches_window)).pack(side='right')
                 ttk.Button(branch_frame, text="Establecer como predeterminada", command=lambda b=branch: self.set_default_branch(b, branches_window, update_default_branch_label)).pack(side='right')
-                
-            ttk.Button(branches_window, text="Crear Nueva Rama", command=lambda: self.create_branch(branches_window)).pack(pady=10)
-            
+
+            ttk.Button(scrollable_frame, text="Crear Nueva Rama", command=lambda: self.create_branch(branches_window)).pack(pady=10)
+
             if update_default_branch_label:
                 branches_window.after(100, update_default_branch_label)
-                
+
         else:
             messagebox.showerror("Error", "No se pudieron obtener las ramas del repositorio")
+
+        # Configurar el layout
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        # Ajustar el tamaño de la ventana y centrarla
+        branches_window.update_idletasks()  # Actualizar la geometría de la ventana
+        width = min(branches_window.winfo_reqwidth(), 350)  # Limitar el ancho máximo a 500
+        height = min(branches_window.winfo_reqheight(), 100)  # Limitar la altura máxima a 400
+        self.center_window(branches_window, width, height)
+
+        # Configurar el evento de redimensionamiento
+        branches_window.bind("<Configure>", lambda e: self.on_window_configure(e, canvas))
+
+    def on_window_configure(self, event, canvas):
+        # Ajustar el tamaño del canvas al tamaño de la ventana
+        canvas.config(width=event.width-20, height=event.height-20)  # -20 para dar espacio a la barra de desplazamiento
 
     def delete_branch(self, branch, branches_window):
         confirm = messagebox.askyesno("Confirmar", f"¿Está seguro de que desea eliminar la rama '{branch['name']}'?")
